@@ -135,6 +135,9 @@ CURLcode Curl_SOCKS4(const char *proxy_name,
   curl_socket_t sock = conn->sock[sockindex];
   long timeout;
   struct SessionHandle *data = conn->data;
+  union _aliasing_helper aliasing_helper;
+
+  aliasing_helper.charptr = socksreq;
 
   /* get timeout */
   timeout = Curl_timeleft(conn, NULL, TRUE);
@@ -160,7 +163,10 @@ CURLcode Curl_SOCKS4(const char *proxy_name,
 
   socksreq[0] = 4; /* version (SOCKS4) */
   socksreq[1] = 1; /* connect */
-  *((unsigned short*)&socksreq[2]) = htons((unsigned short)remote_port);
+
+  // was *((unsigned short*)&socksreq[2])
+  // shorts = 2 chars long, so index /= 2
+  aliasing_helper.shortptr[1] = htons((unsigned short)remote_port);
 
   /* DNS resolve only for SOCKS4, not SOCKS4a */
   if (!protocol4a) {
@@ -310,7 +316,7 @@ CURLcode Curl_SOCKS4(const char *proxy_name,
             ", request rejected or failed.",
             (unsigned char)socksreq[4], (unsigned char)socksreq[5],
             (unsigned char)socksreq[6], (unsigned char)socksreq[7],
-            (unsigned int)ntohs(*(unsigned short*)(&socksreq[8])),
+            (unsigned int)ntohs(aliasing_helper.shortptr[4]),
             socksreq[1]);
       return CURLE_COULDNT_CONNECT;
     case 92:
@@ -320,7 +326,7 @@ CURLcode Curl_SOCKS4(const char *proxy_name,
             "identd on the client.",
             (unsigned char)socksreq[4], (unsigned char)socksreq[5],
             (unsigned char)socksreq[6], (unsigned char)socksreq[7],
-            (unsigned int)ntohs(*(unsigned short*)(&socksreq[8])),
+            (unsigned int)ntohs(aliasing_helper.shortptr[4]),
             socksreq[1]);
       return CURLE_COULDNT_CONNECT;
     case 93:
@@ -330,7 +336,7 @@ CURLcode Curl_SOCKS4(const char *proxy_name,
             "report different user-ids.",
             (unsigned char)socksreq[4], (unsigned char)socksreq[5],
             (unsigned char)socksreq[6], (unsigned char)socksreq[7],
-            (unsigned int)ntohs(*(unsigned short*)(&socksreq[8])),
+            (unsigned int)ntohs(aliasing_helper.shortptr[4]),
             socksreq[1]);
       return CURLE_COULDNT_CONNECT;
     default:
@@ -339,7 +345,7 @@ CURLcode Curl_SOCKS4(const char *proxy_name,
             ", Unknown.",
             (unsigned char)socksreq[4], (unsigned char)socksreq[5],
             (unsigned char)socksreq[6], (unsigned char)socksreq[7],
-            (unsigned int)ntohs(*(unsigned short*)(&socksreq[8])),
+            (unsigned int)ntohs(aliasing_helper.shortptr[4]),
             socksreq[1]);
       return CURLE_COULDNT_CONNECT;
     }
@@ -389,6 +395,9 @@ CURLcode Curl_SOCKS5(const char *proxy_name,
   bool socks5_resolve_local = (bool)(data->set.proxytype == CURLPROXY_SOCKS5);
   const size_t hostname_len = strlen(hostname);
   ssize_t packetsize = 0;
+  union _aliasing_helper aliasing_helper;
+
+  aliasing_helper.charptr = socksreq;
 
   /* RFC1928 chapter 5 specifies max 255 chars for domain name in packet */
   if(!socks5_resolve_local && hostname_len > 255)
@@ -437,6 +446,7 @@ CURLcode Curl_SOCKS5(const char *proxy_name,
   socksreq[2] = 0; /* no authentication */
   socksreq[3] = 2; /* username/password */
 #endif
+
 
   curlx_nonblock(sock, FALSE);
 
@@ -586,8 +596,9 @@ CURLcode Curl_SOCKS5(const char *proxy_name,
     socksreq[4] = (char) hostname_len; /* address length */
     memcpy(&socksreq[5], hostname, hostname_len); /* address bytes w/o NULL */
 
-    *((unsigned short*)&socksreq[hostname_len+5]) =
-      htons((unsigned short)remote_port);
+    aliasing_helper.charptr = &socksreq[hostname_len+5];
+    aliasing_helper.shortptr[0] = htons((unsigned short)remote_port);
+    aliasing_helper.charptr = socksreq;
   }
   else {
     struct Curl_dns_entry *dns;
@@ -637,7 +648,7 @@ CURLcode Curl_SOCKS5(const char *proxy_name,
       return CURLE_COULDNT_RESOLVE_HOST;
     }
 
-    *((unsigned short*)&socksreq[8]) = htons((unsigned short)remote_port);
+    aliasing_helper.shortptr[4] = htons((unsigned short)remote_port);
   }
 
 #if defined(HAVE_GSSAPI) || defined(USE_WINDOWS_SSPI)
@@ -675,7 +686,7 @@ CURLcode Curl_SOCKS5(const char *proxy_name,
             "Can't complete SOCKS5 connection to %d.%d.%d.%d:%d. (%d)",
             (unsigned char)socksreq[4], (unsigned char)socksreq[5],
             (unsigned char)socksreq[6], (unsigned char)socksreq[7],
-            (unsigned int)ntohs(*(unsigned short*)(&socksreq[8])),
+            (unsigned int)ntohs(aliasing_helper.shortptr[4]),
             socksreq[1]);
       return CURLE_COULDNT_CONNECT;
   }

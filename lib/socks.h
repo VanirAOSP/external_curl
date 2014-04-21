@@ -66,4 +66,9 @@ CURLcode Curl_SOCKS5_gssapi_negotiate(int sockindex,
                                       struct connectdata *conn);
 #endif
 
+union _aliasing_helper {
+    unsigned char *charptr;
+    unsigned short *shortptr;
+};
+
 #endif  /* __SOCKS_H */
